@@ -1,7 +1,8 @@
-import {View, Text, StyleSheet, KeyboardAvoidingView,Keyboard} from 'react-native';
-import React, {useEffect, useState} from 'react';
+import {View, Text, StyleSheet, KeyboardAvoidingView,Keyboard,ActivityIndicator} from 'react-native';
+import React, {useContext, useEffect, useState} from 'react';
 import axios from 'axios';
 import SnackBar from 'react-native-snackbar'
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // custom import
 import Screen from '../components/Screen';
 import CustomButton from '../components/CustomButton';
@@ -9,68 +10,183 @@ import CustomTextInput from '../components/CustomTextInput';
 import {validateInput} from '../utils/validators';
 import ErrorText from '../components/ErrorText';
 import { LOGIN_URL } from '../constants/api';
+import { UserContext } from '../utils/userDataContext';
 // --------------------------------------
 
 export default function LoginScreen() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [secureTextEntry, setSecureTextEntry] = useState(true);
-  const [error, setError] = useState(false);
+  const [phoneError, setPhoneError] = useState(false);
+  const [passwordError, setPasswordError] = useState(false);
+  const [dataStored,setDataStored]=useState(false)
+  const [isIndicator,setIsIndicator]=useState(false)
+const {isLoggedIn,setIsLoggedIn,setUserId,userId}=useContext(UserContext)
 
 
 useEffect(()=>{
-    setError(false)
+  if (passwordError || phoneError){
+    setPhoneError(false)
+    setPasswordError(false)
+    
+  }
+    
 },[phoneNumber,password])
 
+useEffect(()=>{
 
-  function handleSignIn() {
-    Keyboard.dismiss()
-    const isPhoneNumberValid = validateInput(
-      
-      phoneNumber,
-      setError,
-    );
-    const isPasswordValid = validateInput(password, setError);
-    if (isPhoneNumberValid && isPasswordValid){
-        const formData=new FormData()
-        formData.append("mobile",phoneNumber)
-        formData.append("password",password)
-const loginUser=async()=>{
-    try{
-        const result = await axios({
-             url:LOGIN_URL,
-             method:"post",
-             data:formData,
-             headers:{
-                 Accept:"application/json",
-                 "content-type":"multipart/form-data"
-             }
-         })
-         SnackBar.show({
-            text:result.data.msg,
-            duration:SnackBar.LENGTH_SHORT
-         })
-        if (result.data.sts === "00"){
-            return false
-        }
-     }catch(error){
-         console.log(error.message)
-         SnackBar.show({
-            text:error.message,
-            duration:SnackBar.LENGTH_SHORT
-         })
-     }
+})
 
-}
-
-       loginUser()
-    }
-return loginUser
+useEffect(()=>{
+  if(dataStored){
+    setIsLoggedIn(true)
+    setIsIndicator(false)
   }
+},[dataStored])
+
+async function handleSignIn() {
+  setIsIndicator(true)
+  Keyboard.dismiss();
+  const isPhoneNumberValid = validateInput(phoneNumber, setPhoneError);
+  const isPasswordValid = validateInput(password, setPasswordError);
+  if (isPhoneNumberValid && isPasswordValid){
+      const formData = new FormData();
+      formData.append("mobile", phoneNumber);
+      formData.append("password", password);
+
+      const loginUser = async () => {
+          try {
+              const result = await axios({
+                  url: LOGIN_URL,
+                  method: "post",
+                  data: formData,
+                  headers: {
+                      Accept: "application/json",
+                      "content-type": "multipart/form-data"
+                  }
+              });
+
+              SnackBar.show({
+                  text: result.data.msg,
+                  duration: SnackBar.LENGTH_SHORT
+              });
+
+              if (result.data?.sts === "01") {
+                console.log(result.data)
+                  setUserId(result.data?.user?.id.toString());
+
+                  async function storeData() {
+                      try {
+                          await AsyncStorage.setItem("userId", result.data?.user?.id.toString()); // Use `result.data?.user?.id` here to ensure the right data is stored
+                          console.log(userId, "login screen");
+                          setDataStored(true)
+                          return true;
+                      } catch (error) {
+                          setIsLoggedIn(false);
+                          return false;
+                      }
+                  }
+
+                  const isStored = await storeData(); // Wait for storeData to complete
+                  return isStored; // Return true if storing data succeeded, false otherwise
+              } else {
+                  SnackBar.show({
+                      text: result.data.msg,
+                      duration: SnackBar.LENGTH_SHORT
+                  });
+                  return false;
+              }
+          } catch (error) {
+              console.log("login screen", error.message);
+              SnackBar.show({
+                  text: error.message,
+                  duration: SnackBar.LENGTH_SHORT
+              });
+              
+              return false;
+          }
+          
+      };
+
+     loginUser(); 
+     
+  }else{
+    setIsIndicator(false)
+  }
+  
+}
+//   async function handleSignIn() {
+//     Keyboard.dismiss()
+//     const isPhoneNumberValid = validateInput(
+      
+//       phoneNumber,
+//       setPhoneError,
+//     );
+//     const isPasswordValid = validateInput(password, setPasswordError);
+//     if (isPhoneNumberValid && isPasswordValid){
+//         const formData=new FormData()
+//         formData.append("mobile",phoneNumber)
+//         formData.append("password",password)
+// const loginUser=async()=>{
+//     try{
+//         const result = await axios({
+//              url:LOGIN_URL,
+//              method:"post",
+//              data:formData,
+//              headers:{
+//                  Accept:"application/json",
+//                  "content-type":"multipart/form-data"
+//              }
+//          })
+//          SnackBar.show({
+//             text:result.data.msg,
+//             duration:SnackBar.LENGTH_SHORT
+//          })
+//         if (result.data?.sts === "01"){
+//           setUserId(result.data?.user?.id)
+//           async function storeData(){
+//             try{
+//               await AsyncStorage.setItem("userId",userId.toString())
+//               console.log(userId,"login screen")
+//               return true
+//             }catch(error){
+              
+// setIsLoggedIn(false)
+// return false
+//             }
+//           }
+//           storeData()
+          
+//             // console.log("Login screen",result.data)
+//         }else{
+//           SnackBar.show({
+//             text:result.data.msg,
+//             duration:SnackBar.LENGTH_SHORT
+//          })
+//         }
+//      }catch(error){
+//          console.log("login screen", error.message)
+//          SnackBar.show({
+//             text:error.message,
+//             duration:SnackBar.LENGTH_SHORT
+//          })
+//          return false
+//      }
+
+// }
+// const isLoggedin = await loginUser()
+// console.log(isLoggedin)
+       
+//     }
+
+
+//   }
 
   return (
     <>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : null} keyboardVerticalOffset={-100} style={styles.container}>
+   <ActivityIndicator style={styles.activityIndicator} animating={isIndicator} size="small" color="#7091A4"/>
+
         <View style={styles.textContainer}>
           <Text style={styles.welcomeText}>
             Welcome to <Text style={styles.agbm}>ABGM</Text>
@@ -85,7 +201,7 @@ return loginUser
           placeholder="Enter Your Mobile Number"
           value={phoneNumber}
         />
-        {error && <ErrorText>Phone Number field required</ErrorText>}
+        {phoneError && <ErrorText>Phone Number field required</ErrorText>}
         <CustomTextInput
           iconEnd="eye"
           iconStart="lock"
@@ -95,7 +211,7 @@ return loginUser
           secureTextEntry={secureTextEntry}
           value={password}
         />
-        {error && <ErrorText>Password field required</ErrorText>}
+        {passwordError && <ErrorText>Password field required</ErrorText>}
         </View>
 
         <View  style={{width: '100%', marginTop: '5%'}}>
@@ -138,4 +254,8 @@ const styles = StyleSheet.create({
     marginTop: "-10%",
     marginBottom: '15%',
   },
+  activityIndicator:{
+    position:"absolute",
+    top:"10%"
+  }
 });
